@@ -495,13 +495,14 @@ func buildAdmin(agentConfig config.AgentConfig) (*boot.Admin, error) {
 	}
 }
 
-func buildNode(id string, cluster string, zone string, metadata *structpb.Struct) *core.Node {
+func buildNode(id string, cluster string, metadata *structpb.Struct) *core.Node {
 	node := &core.Node{
 		Id:       id,
 		Cluster:  cluster,
 		Metadata: metadata,
 	}
 
+	zone := platforminfo.GetZoneId(metadata)
 	if zone != "" {
 		region, err := getRegion()
 		if err == nil && region != "" {
@@ -1538,12 +1539,11 @@ func bootstrap(agentConfig config.AgentConfig, fileUtil FileUtil, envoyCLIInst E
 		return nil, err
 	}
 
-	zone := platforminfo.GetZoneId(metadata)
 	isServiceConnect := agentConfig.XdsEndpointUdsPath != ""
 
 	b := &boot.Bootstrap{
 		Admin:            admin,
-		Node:             buildNode(id, clusterId, zone, metadata),
+		Node:             buildNode(id, clusterId, metadata),
 		LayeredRuntime:   lr,
 		DynamicResources: dr,
 		ClusterManager:   buildClusterManager(isServiceConnect),

@@ -621,20 +621,27 @@ address:
 func TestBuildNode(t *testing.T) {
 	setup()
 	os.Setenv("AWS_REGION", "us-west-2")
-	metadata := structpb.NewNullValue().GetStructValue()
-	checkMessage(t, buildNode("id", "cluster", "use1-az1", metadata), `
+	metadata, _ := structpb.NewStruct(map[string]interface{}{
+		"aws.appmesh.platformInfo": map[string]interface{}{
+			"AvailabilityZoneID": "use1-az1",
+		},
+	})
+	checkMessage(t, buildNode("id", "cluster", metadata), `
 id: id
 cluster: cluster
 locality:
   region: us-west-2
   zone: use1-az1
+metadata:
+  aws.appmesh.platformInfo:
+    AvailabilityZoneID: use1-az1
 `)
 }
 
 func TestBuildNodeWithEmptyZone(t *testing.T) {
 	setup()
 	metadata := structpb.NewNullValue().GetStructValue()
-	checkMessage(t, buildNode("id", "cluster", "", metadata), `
+	checkMessage(t, buildNode("id", "cluster", metadata), `
 id: id
 cluster: cluster
 `)
@@ -642,18 +649,14 @@ cluster: cluster
 
 func TestBuildNodeMetadata_ContainerIPMapping(t *testing.T) {
 	setup()
-	os.Setenv("AWS_REGION", "us-west-2")
 	os.Setenv("APPNET_CONTAINER_IP_MAPPING", `{"C1":"172.10.1.1","C2":"172.10.1.2"}`)
 	defer os.Unsetenv("APPNET_CONTAINER_IP_MAPPING")
 	metadata, err := buildMetadataForNode()
 	assert.Nil(t, err)
 	// ignore metadata: aws.appmesh.platformInfo & aws.appmesh.task.interfaces
-	checkMessageSupersetMatch(t, buildNode("id", "cluster", "use1-az1", metadata), `
+	checkMessageSupersetMatch(t, buildNode("id", "cluster", metadata), `
 id: id
 cluster: cluster
-locality:
-  region: us-west-2
-  zone: use1-az1
 metadata:
   aws.ecs.serviceconnect.ClusterIPMapping:
     C1: 172.10.1.1
@@ -663,18 +666,14 @@ metadata:
 
 func TestBuildNodeMetadata_ListenerPortMapping(t *testing.T) {
 	setup()
-	os.Setenv("AWS_REGION", "us-west-2")
 	os.Setenv("APPNET_LISTENER_PORT_MAPPING", `{"Listener1":15000,"Listener2":15001}`)
 	defer os.Unsetenv("APPNET_LISTENER_PORT_MAPPING")
 	metadata, err := buildMetadataForNode()
 	assert.Nil(t, err)
 	// ignore metadata: aws.appmesh.platformInfo & aws.appmesh.task.interfaces
-	checkMessageSupersetMatch(t, buildNode("id", "cluster", "use1-az1", metadata), `
+	checkMessageSupersetMatch(t, buildNode("id", "cluster", metadata), `
 id: id
 cluster: cluster
-locality:
-  region: us-west-2
-  zone: use1-az1
 metadata:
   aws.ecs.serviceconnect.ListenerPortMapping:
     Listener1: 15000
@@ -684,16 +683,12 @@ metadata:
 
 func TestBuildNodeMetadata_StaticRuntimeMappingDefault(t *testing.T) {
 	setup()
-	os.Setenv("AWS_REGION", "us-west-2")
 	metadata, err := buildMetadataForNode()
 	assert.Nil(t, err)
 	// ignore metadata: aws.appmesh.platformInfo & aws.appmesh.task.interfaces
-	checkMessageSupersetMatch(t, buildNode("id", "cluster", "use1-az1", metadata), `
+	checkMessageSupersetMatch(t, buildNode("id", "cluster", metadata), `
 id: id
 cluster: cluster
-locality:
-  region: us-west-2
-  zone: use1-az1
 metadata:
   aws.appmesh.static_runtime:
     envoy.features.enable_all_deprecated_features: true
@@ -706,7 +701,6 @@ metadata:
 
 func TestBuildNodeMetadata_StaticRuntimeMappingDefaultOverridden(t *testing.T) {
 	setup()
-	os.Setenv("AWS_REGION", "us-west-2")
 	os.Setenv("APPMESH_SET_TRACING_DECISION", "false")
 	defer os.Unsetenv("APPMESH_SET_TRACING_DECISION")
 	os.Setenv("ENVOY_NO_EXTENSION_LOOKUP_BY_NAME", "false")
@@ -718,12 +712,9 @@ func TestBuildNodeMetadata_StaticRuntimeMappingDefaultOverridden(t *testing.T) {
 	metadata, err := buildMetadataForNode()
 	assert.Nil(t, err)
 	// ignore metadata: aws.appmesh.platformInfo & aws.appmesh.task.interfaces
-	checkMessageSupersetMatch(t, buildNode("id", "cluster", "use1-az1", metadata), `
+	checkMessageSupersetMatch(t, buildNode("id", "cluster", metadata), `
 id: id
 cluster: cluster
-locality:
-  region: us-west-2
-  zone: use1-az1
 metadata:
   aws.appmesh.static_runtime:
     envoy.features.enable_all_deprecated_features: true
@@ -3170,7 +3161,6 @@ func TestBuildMetadataForNode_FipsModeEnabled_NotSet(t *testing.T) {
 
 func TestBuildMetadataForNode_FipsModeEnabled_TruthyValues(t *testing.T) {
 	setup()
-	os.Setenv("AWS_REGION", "us-west-2")
 	testCases := []struct {
 		value string
 	}{
@@ -3187,14 +3177,11 @@ func TestBuildMetadataForNode_FipsModeEnabled_TruthyValues(t *testing.T) {
 		expectedYaml := `
 id: id
 cluster: cluster
-locality:
-  region: us-west-2
-  zone: use1-az1
 metadata:
   aws.appmesh.platformInfo:
     fipsModeEnabled: true
 `
-		checkMessageSupersetMatch(t, buildNode("id", "cluster", "use1-az1", metadata), expectedYaml)
+		checkMessageSupersetMatch(t, buildNode("id", "cluster", metadata), expectedYaml)
 		os.Unsetenv("APPNET_FIPS_MODE_ENABLED")
 	}
 }
